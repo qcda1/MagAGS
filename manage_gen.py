@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Function to perform generator control with a relay board
+# Function to perform generator control with a relay board.
 # It is meant to be used in a Magnum Energy setup using 
-# the ME-AGS-N Auto Generator Start module
+# the ME-AGS-N Auto Generator Start module and the ME-PT1 or ME-PT2 relay connector.
 # Uses the HID library instead of usb.
-# Uses relay.py to interface with the relay board
+# Uses relay.py to interface with the relay board.
 #
 from relay import Relay
 

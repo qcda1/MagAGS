@@ -27,6 +27,8 @@ To test the setup:
 2. Copy relay.py Python script
 3. Plug your dual USB dual relay
 4. Run relay.py You should hear and see the relay being switched on and off
+5. If all good, you can run manage_gen.py as by default, will simulate the operation
+   of a generator autostart when battery SOC goes low.
 
 
 ## Pictures:
