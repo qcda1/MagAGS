@@ -30,6 +30,10 @@ To test the setup:
 5. If all good, you can run manage_gen.py as by default, will simulate the operation
    of a generator autostart when battery SOC goes low.
 
+## Wiring diagram
+![MagAGS](https://github.com/user-attachments/assets/d9f7bc4a-2950-41c1-9690-f6a1d08e7f2b)
+
+
 
 ## Pictures:
 ![USBRelayBoard](https://github.com/user-attachments/assets/a82dfc05-3514-4a22-a217-e1e74213336c)
