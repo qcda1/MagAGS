@@ -36,10 +36,10 @@ To test the setup:
 
 
 ## Pictures:
-![USBRelayBoard](https://github.com/user-attachments/assets/a82dfc05-3514-4a22-a217-e1e74213336c)
-![RPI4](https://github.com/user-attachments/assets/2d065590-8cc1-4826-af19-65447920f2e5)
+![RelayBoard](https://github.com/user-attachments/assets/e3c6516a-7ad6-4004-a510-9446ae4cf337)
+![RPI4](https://github.com/user-attachments/assets/2c0e2180-4ee7-4a23-ac34-12cacd0f28a9)
 ![ME-AGS-N](https://github.com/user-attachments/assets/c746d700-a8e7-41e2-983c-d1db98b48d24)
-![ME-PT2](https://github.com/user-attachments/assets/525a46e9-4020-4849-8e2c-85f9ff5e7d50)
+![ME-PT2](https://github.com/user-attachments/assets/4772d69d-8bb8-4bdf-a7c1-061aa648c5bb)
 
 ## References
 - The above solution is based on the excellent work performed here: https://github.com/jaketeater/Very-Simple-USB-Relay
