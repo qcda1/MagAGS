@@ -44,7 +44,7 @@ the lead SOC to manage the generator.
 ## Setup
 
 1. In the Python code:
-Make sure you specify your lower and upper limit of SOC in the manage_gen() function. You can start with the current values and adjust to your needs.
+Make sure you specify your lower and upper limit of SOC in the manage_gen() function. You can start with the current values and adjust to your needs. Refer to manage_gen.py source to see how to use the function with its input parameters.
 2. You will need to perform these changes in the ME-AGS-N configuration:
 
 ## Wiring diagram
