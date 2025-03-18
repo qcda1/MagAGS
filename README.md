@@ -41,8 +41,17 @@ inverter/charger and the MapleLeaf Beaver 48VDC/100Ah batteries. From these, I g
 the SOC. I believe the SOC from the Classic 150 with Whizbang JR is the most accurate so that will be
 the lead SOC to manage the generator.
 
+## Setup
+
+1. In the Python code:
+Make sure you specify your lower and upper limit of SOC in the manage_gen() function. You can start with the current values and adjust to your needs.
+2. You will need to perform these changes in the ME-AGS-N configuration:
+
 ## Wiring diagram
 ![MagAGS](https://github.com/user-attachments/assets/d9f7bc4a-2950-41c1-9690-f6a1d08e7f2b)
+
+
+
 ## Pictures:
 ![RelayBoard](https://github.com/user-attachments/assets/e3c6516a-7ad6-4004-a510-9446ae4cf337)
 ![RPI4](https://github.com/user-attachments/assets/2c0e2180-4ee7-4a23-ac34-12cacd0f28a9)
