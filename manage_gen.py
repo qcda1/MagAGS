@@ -28,10 +28,10 @@ def manage_gen(SOC, SOC1, SOC2, relay):
     if SOC1 < 0 or SOC1 > 100: raise Exception("SOC1 must be between 0 and 100.")
     if SOC2 < 0 or SOC2 > 100: raise Exception("SOC2 must be between 0 and 100.")
     if SOC1 > SOC2: raise Exception("SOC1 must be less than SOC2.")
-    if SOC2 - SOC1 < 5: raise Exception("SOC window too narrow. Must be over 5%.")
+    if SOC2 - SOC1 < 3: raise Exception("SOC window too narrow. Must be over 5%.")
 
     # The relay will turn on when SOC will go down to SOC1 and turn off when SOC will 
-    # go up to SOC2.
+    # go up to SOC2. Otherwise it will maintain the current state.
     if SOC <= SOC1:
         relay.state(1, on=True)
         return "ON"

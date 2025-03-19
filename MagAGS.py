@@ -63,6 +63,8 @@ curs = conn.cursor()
 
 # Objet relay
 relay = Relay(idVendor=0x16c0, idProduct=0x05df)
+# Turn all switches off
+relay.state(0, on=False)
 
 while cmd == 'RUN':
     start = time.time()
@@ -76,9 +78,16 @@ while cmd == 'RUN':
     data = curs.fetchall()
 
     resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
-    log.debug(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
     print(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}, currentstate={relay.state(1)}")
 
+    if resp == "ON":
+        relay.state(1, on=True)
+        log.info("Generator on")
+    if resp == "OFF":
+        relay.state(1, on=False)
+        log.info("Generator off")
+    log.debug(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}, currentstate={relay.state(1)}")
+        
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
