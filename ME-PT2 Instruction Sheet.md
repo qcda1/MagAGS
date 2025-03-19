@@ -21,7 +21,5 @@ When using the ME-PT2 with the ME-AGS-N, configure the ME-RC (or ME-ARC) to allo
 2. Using a maintain type switch: If the switch is set to ON, the generator continues to run until the switch is set to OFF. Once the switch is set to OFF, the generator will run for two minutes, and then stop.
 
 
-<span style="color:yellow"> **Info:** In my application, I am using a momentary type switch. When reaching the low SOC level, the relay will switch on for one second to start the generator simulating a momentary switch. The generator will run for the set "Set Gen Run Temp Time" value of 0.5h or 30 minutes.</span>
-
-
+> **Info:** In my application, I am using a momentary type switch. When reaching the low SOC level, the relay will switch on for one second to start the generator simulating a momentary switch. The generator will run for the set "Set Gen Run Temp Time" value of 0.5h or 30 minutes.
 
