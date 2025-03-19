@@ -85,16 +85,21 @@ while cmd == 'RUN':
 
     if resp == "ON":
         relay.state(1, on=True)
-        log.info("Generator on")
+        log.debug("Generator on")
     if resp == "OFF":
         relay.state(1, on=False)
-        log.info("Generator off")
+        log.debug("Generator off")
     log.debug(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
         
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
-        time.sleep(delay)
+        try:
+            time.sleep(delay)
+        except KeyboardInterrupt:
+            log.info("KeyboardInterrupt")
+            cmd = 'STOP'
+            break
 
 log.info("Fin de la boucle principale")
 
