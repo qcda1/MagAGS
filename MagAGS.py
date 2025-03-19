@@ -77,8 +77,8 @@ while cmd == 'RUN':
 
     resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
     log.debug(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
-    print(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
-    
+    print(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}, currentstate={relay.state(1)}")
+
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
