@@ -1,9 +1,5 @@
 # MagAGS
-External control of Magnum Energy ME-AGS-N module instead of ME-BMK using a Raspberry Pi
-
-**_NOTICE: At the creation of this repository, only the relay.py and manage_gen() parts were tested with the relay board
-        in Debian. All tested fine. I'm waiting for the delivery of the ME-PT2. I expect putting this in production
-        with the generator in the second half of mars 2025. The repository will be updated accordingly._**
+### *External control of Magnum Energy ME-AGS-N module instead of ME-BMK using a Raspberry Pi*
 
 ## Introduction
 The Magnum Energy inverter/charger line of business is discontinued since september 2024. This means there is no more support. I run a MS4448PAE inverter/charger since 2014 in an offgrid cottage and workshop powered by solar energy. The unit work flawlessly with all sorts of loads. It is also equiped with the ME-AGS-N generator controller to charge batteries from generator power in cloudy months. In october of 2024, I moved from FLA battery bank to LiFePO4 batteries. Since then, the ME-AGS can't use battery voltage to detect time to charge and automatically start the generator. The discharge voltage curve is too flat and the Magnum not accurate enough. So I purchased a BMK (Battery Management Kit) that estimate the battery's SOC (State Of Charge) and allow the AGS to manage the generator use form the % SOC instead of the battery's voltage. Unfortunately, the BMK has the issue where it detect 100% SOC too early in the charging process. For example after a day without sun, the SOC would be at 85% and on a cloudy day with little power, something happen in the BMK making it go at 100%. From that point, there is 15% difference between real battery SOC and what the BMK believe it is at. This is a major issue since the BMK overestimate the SOC meaning that at low SOC, it is possible that the AGS doesn't start the generator when the battery are low... This could potentially drain the battery bank completely or prevent me from using the whole battery's content.
@@ -48,11 +44,11 @@ the lead SOC to manage the generator.
 You call the manage_gen() function with three values. First the SOC value of the battery bank, second the desired low %SOC limit and thirdly the high %SOC limit. You can start with the current default values and adjust to your needs. Refer to manage_gen.py source to see how to use the function with its input parameters.
 2. You will need to perform these changes in the ME-AGS-N configuration:
 - Set the **Set Gen Run Temp Start** to **Ext Input**.
-- Set the **Set Gen Run Temp Time** ro **0.5h**. 0.5h is a fixed minimum.
+- Set the **Set Gen Run Temp Time** ro **0.5h**. 0,5h is the minimum.
 - Set the **Ctrl 03 Gen Control** menu is set to **AUTO**
-This confirm the AGS will be triggered by the ME-PT2 connector and the generator will run for 0.5h. The ME-AGS expect a momentary type switching or a maintain type switching. Refer to the user manual excerpts below for the explanations about how the mE-AGS handle the generator operation for the two switching types.
+This confirm the AGS will be triggered by the ME-PT2 connector and the generator will run for 0.5h. The ME-AGS expect a momentary type switching or a maintain type switching. Refer to the user manual excerpts below for the explanations about how the mE-AGS handle the generator operation for the two switching types. Note also that the 'Set Gen Run Temp Time' parameter has a 0,5h increment.
 
-> In my case, I have a battery bank of 20kWh and my Magnum inverter/charger will charge at a maximum of 3kW. This mean that one run of 0.5h at full power will provide 6kWh or 30%. I'm planning to automatically run the generator if the SOC goes under 5% when present and 20% when absent. This should bring up the SOC to 35% when present and 50% when absent. The reason for the 20% when absent is to give me some time to react and drive to the cottage if the generator fall in a fault knowing consumption is approx 2.5% per day whe absent.
+> In my case, I have a battery bank of 20kWh and my Magnum inverter/charger will charge at a maximum of 3kW. This mean that one run of 0,5h at full power will provide 1,5kWh or 7,5%. I'm planning to automatically run the generator if the SOC reaches 5% when present and 20% when absent. This should bring up the SOC to 12,5% when present and 27,5% when absent. The reason for the 20% when absent is to give me some time to react and drive to the cottage if the generator fall in a fault knowing consumption is approx 2,5% per day whe absent.
 
 
 As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2%20Instruction%20Sheet.md)
