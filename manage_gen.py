@@ -9,7 +9,7 @@
 #
 from relay import Relay
 
-def manage_gen(SOC, SOC1, SOC2):
+def manage_gen(SOC, SOC1, SOC2, relay):
     '''
     Function to magange the automatic start/stop of the generator
     based on the supplied range of SOC values.
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             else:
                 soc = soc + 3
 
-        resp = manage_gen(soc, 20, 40)
+        resp = manage_gen(soc, 20, 40, relay)
         print(f"soc={soc} manage_gen={resp}") 
         sleep(0.5)
 

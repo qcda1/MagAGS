@@ -46,9 +46,11 @@ You call the manage_gen() function with three values. First the SOC value of the
 - Set the **Set Gen Run Temp Start** to **Ext Input**.
 - Set the **Set Gen Run Temp Time** ro **0.5h**. 0,5h is the minimum.
 - Set the **Ctrl 03 Gen Control** menu is set to **AUTO**
+
 This confirm the AGS will be triggered by the ME-PT2 connector and the generator will run for 0.5h. The ME-AGS expect a momentary type switching or a maintain type switching. Refer to the user manual excerpts below for the explanations about how the mE-AGS handle the generator operation for the two switching types. Note also that the 'Set Gen Run Temp Time' parameter has a 0,5h increment.
 
-> In my case, I have a battery bank of 20kWh and my Magnum inverter/charger will charge at a maximum of 3kW. This mean that one run of 0,5h at full power will provide 1,5kWh or 7,5%. I'm planning to automatically run the generator if the SOC reaches 5% when present and 20% when absent. This should bring up the SOC to 12,5% when present and 27,5% when absent. The reason for the 20% when absent is to give me some time to react and drive to the cottage if the generator fall in a fault knowing consumption is approx 2,5% per day whe absent.
+#### In my case, I have a battery bank of 20kWh and my Magnum inverter/charger will charge at a maximum of 3kW. This mean that one run of 0,5h at full power will provide 1,5kWh or 7,5%. I'm planning to automatically run the generator if the SOC reaches 5% when present and 20% when absent. This should bring up the SOC to 12,5% when present and 27,5% when absent. The reason for the 20% when absent is to give me some time to react and drive to the cottage if the generator fall in a fault knowing consumption is approx 2,5% per day whe absent.
+#### My first test showed that shorting momentarily the ME-PT2 wires for a few seconds, the generator started but to my surprise, ran for approx two minutes instead of the 0,5h minimum setting. This does not correspond to the technical description in the manual. Parameter checks and few other tests were performed to confirm the behavior. A test was then performed by keeping the wires shorted for 10 minutes. the generator ran for that time and stopped when the wires were disconnected. The programming was asjusted accordingly.
 
 
 As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2%20Instruction%20Sheet.md)
