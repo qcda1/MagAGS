@@ -56,9 +56,6 @@ interval = 10 # boucle aux 60 secondes
 # Condition de la boucle sans fin. Si la valeur change, on sort de la boucle.
 cmd = 'RUN'
 
-# Valeurs des SOC min et max
-SOCmin = int(getconf('SOCsetpoints')[0:2])
-SOCmax = int(getconf('SOCsetpoints')[2:4])
 
 # Connexion à la base de données
 conn = sqlite3.connect("../monitormidnite/monitormidnite.db")
@@ -70,14 +67,18 @@ relay = Relay(idVendor=0x16c0, idProduct=0x05df)
 while cmd == 'RUN':
     start = time.time()
     log.debug("Bouclage... %s", str(start))
+    # Valeurs des SOC min et max
+    SOCmin = int(getconf('SOCsetpoints')[0:2])
+    SOCmax = int(getconf('SOCsetpoints')[2:4])
+
 
     curs.execute("select dtm, soc from onem order by dtm desc limit 1")
     data = curs.fetchall()
-    print(data)
 
     resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
-    log.debug(f"dtm = {data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
-
+    log.debug(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
+    print(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}")
+    
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
