@@ -34,7 +34,10 @@ def llevel(level):
         return 50
     return 20
 
-
+def cvtstate(state):
+    if state == True:
+        return 'ON'
+    return 'OFF'
 
 # ===========Programme Principal=======================================================
 
@@ -78,7 +81,7 @@ while cmd == 'RUN':
     data = curs.fetchall()
 
     resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
-    print(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}, currentstate={relay.state(1)}")
+    print(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
 
     if resp == "ON":
         relay.state(1, on=True)
@@ -86,7 +89,7 @@ while cmd == 'RUN':
     if resp == "OFF":
         relay.state(1, on=False)
         log.info("Generator off")
-    log.debug(f"dtm={data[0][0]}, SOC={data[0][1]}, SOCmin={SOCmin}, SOCmax={SOCmax}, resp = {resp}, currentstate={relay.state(1)}")
+    log.debug(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
         
     duration = time.time() - start
     delay = interval - duration
