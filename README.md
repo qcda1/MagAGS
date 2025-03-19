@@ -13,6 +13,7 @@ So I found out there was another way of managing the AGS by using the ME-PT2 ada
 I use the following:
 1. USB dual relay board
 2. Raspberry Pi loaded with its OS
+3. Magnum MS4448PAE inverter/charger with ME-ARC remote
 3. Magnum ME-AGS-N Auto Generator Start module
 4. Magnum ME-PT1 relay connector
 
@@ -32,7 +33,7 @@ To test the setup:
 3. Plug your dual USB dual relay
 4. Run relay.py You should hear and see the relay being switched on and off
 5. If all good, you can run manage_gen.py as by default, will simulate the operation
-   of a generator autostart when battery SOC goes low.
+   of a generator autostart when battery SOC goes low (ex:20%).
 
 Once successfully tested, you can implement the manage_gen() function in your system monitoring program
 with adequate min and max SOC. In my case, I have a monitoring program that loops throught the inquiries of
@@ -44,11 +45,17 @@ the lead SOC to manage the generator.
 ## Setup
 
 1. In the Python code:
-Make sure you specify your lower and upper limit of SOC in the manage_gen() function. You can start with the current values and adjust to your needs. Refer to manage_gen.py source to see how to use the function with its input parameters.
+You call the manage_gen() function with three values. First the SOC value of the battery bank, second the desired low %SOC limit and thirdly the high %SOC limit. You can start with the current default values and adjust to your needs. Refer to manage_gen.py source to see how to use the function with its input parameters.
 2. You will need to perform these changes in the ME-AGS-N configuration:
+- Set the **Set Gen Run Temp Start** to **Ext Input**.
+- Set the **Set Gen Run Temp Time** ro **0.5h**. 0.5h is a fixed minimum.
+- Set the **Ctrl 03 Gen Control** menu is set to **AUTO**
+This confirm the AGS will be triggered by the ME-PT2 connector and the generator will run for 0.5h. The ME-AGS expect a momentary type switching or a maintain type switching. Refer to the user manual excerpts below for the explanations about how the mE-AGS handle the generator operation for the two switching types.
+
+> In my case, I have a battery bank of 20kWh and my Magnum inverter/charger will charge at a maximum of 3kW. This mean that one run of 0.5h at full power will provide 6kWh or 30%. I'm planning to automatically run the generator if the SOC goes under 5% when present and 20% when absent. This should bring up the SOC to 35% when present and 50% when absent. The reason for the 20% when absent is to give me some time to react and drive to the cottage if the generator fall in a fault knowing consumption is approx 2.5% per day whe absent.
 
 
-As a reference, here i an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md)
+As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2%20Instruction%20Sheet.md)
 
 ## Wiring diagram
 ![MagAGS](https://github.com/user-attachments/assets/d9f7bc4a-2950-41c1-9690-f6a1d08e7f2b)
