@@ -61,7 +61,7 @@ SOCmin = int(getconf('SOCsetpoints')[0:2])
 SOCmax = int(getconf('SOCsetpoints')[2:4])
 
 # Connexion à la base de données
-conn = sqlite3.connect("/home/daniel/Backups/monitormidnite/monitormidnite.db")
+conn = sqlite3.connect("../monitormidnite/monitormidnite.db")
 curs = conn.cursor()
 
 # Objet relay
