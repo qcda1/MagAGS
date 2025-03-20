@@ -1,7 +1,6 @@
 *.pyc
 __pycache__/
 MagAGS/
-sv
 lsthid.py
 MagAGS.conf
 MagAGS.log
