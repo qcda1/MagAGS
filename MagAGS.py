@@ -54,7 +54,7 @@ log.info("Log Level = %s", getconf('ll'))
 llevelb = ''
 
 # Intervale de temps
-interval = 10 # boucle aux 60 secondes
+interval = 60 # boucle aux 60 secondes
 
 # Condition de la boucle sans fin. Si la valeur change, on sort de la boucle.
 cmd = 'RUN'
@@ -81,7 +81,7 @@ while cmd == 'RUN':
     data = curs.fetchall()
 
     resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
-    print(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
+#    print(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
 
     if resp == "ON":
         relay.state(1, on=True)
