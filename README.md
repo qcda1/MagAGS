@@ -55,6 +55,9 @@ This confirm the AGS will be triggered by the ME-PT2 connector and the generator
 
 As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2%20Instruction%20Sheet.md)
 
+## Application
+Included in this repository is a copy of my automatic generator start program MagAGS.py. It is made of a never-ending loop that monitors the battery bank's State Of Charge (SOC) and drive the generator start relay based on a lower and upper limit of the SOC. The SOC is read from an operational data acquisition database that keeps track of my solar energy system components. The program can be easily adapted to any systems that tracks a battery SOC.
+
 ## Wiring diagram
 ![MagAGS](https://github.com/user-attachments/assets/d9f7bc4a-2950-41c1-9690-f6a1d08e7f2b)
 
@@ -71,10 +74,3 @@ As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%2
 - USB relay board datasheet: [USBB-RELAY-08(DatasheetFR).pdf](https://github.com/user-attachments/files/18773244/USBB-RELAY-08.DatasheetFR.pdf)
 - ME-PT2 connector: [64-0026-Rev-D-ME-PT2_Booklet_Print.pdf](https://github.com/user-attachments/files/18773310/64-0026-Rev-D-ME-PT2_Booklet_Print.pdf)
 - 
-
-
-
-
-
-
-
