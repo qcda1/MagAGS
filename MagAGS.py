@@ -1,16 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Program to monitor battery bank State Of Charge (SOC) and start/stop the generator in 
-# accordance to a set minimum and maximum SOC.
+# Programme de suivi de l'état de charge SOC de la batterie et contrôle 
+# de la génératrice selon des seuils minimum et maxmimum.
+# Ce programme a été fait pour remplacer le module ME-BMK de Magnum-Energy
+# qui a des problèmes à effectuer le suivi du SOC de la batterie.
 #
-# Written by Daniel Cote, Mars 2025
+# Auteur: Daniel Cote, Mars 2025
 #
 
 import logging
 import sqlite3
 import time
-import datetime
 from conf import getconf
 from relay import Relay
 from manage_gen import manage_gen
@@ -71,26 +72,44 @@ relay.state(0, on=False)
 
 while cmd == 'RUN':
     start = time.time()
-    log.debug("Bouclage... %s", str(start))
+    log.setLevel(llevel(getconf('ll')))
+    log.debug("Bouclage... %s", time.ctime())
     # Valeurs des SOC min et max
     SOCmin = int(getconf('SOCsetpoints')[0:2])
     SOCmax = int(getconf('SOCsetpoints')[2:4])
 
+    genctrl = getconf('genctrl')
 
-    curs.execute("select dtm, soc from onem order by dtm desc limit 1")
-    data = curs.fetchall()
+    if genctrl == "AUTO":
+        # Lecture du dernier enregistrement de la table des données opérationnelles avec
+        # l'horodateur et l'état de charge de la batterie
+        curs.execute("select dtm, soc from onem order by dtm desc limit 1")
+        data = curs.fetchall()
 
-    resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
-#    print(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
+        # Détermination du besoin de démarrage ou de l'arrêt de la génératrice
+        resp =manage_gen(data[0][1], SOCmin, SOCmax, relay)
+        #print(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
 
-    if resp == "ON":
+        # Contrôle du relais selon le besoin de démarrage ou de l'arrêt de la génératrice
+        if resp == "ON":
+            relay.state(1, on=True)
+            log.debug("Generator auto on")
+        if resp == "OFF":
+            relay.state(1, on=False)
+            log.debug("Generator auto off")
+        log.debug(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp={resp}, currentstate={cvtstate(relay.state(1))}")
+    elif genctrl == "ON":
         relay.state(1, on=True)
-        log.debug("Generator on")
-    if resp == "OFF":
+        log.debug("Generator manual ON")
+    elif genctrl == "OFF":
         relay.state(1, on=False)
-        log.debug("Generator off")
-    log.debug(f"dtm={data[0][0]}, SOCmin={SOCmin}, SOC={data[0][1]}, SOCmax={SOCmax}, resp = {resp}, currentstate={cvtstate(relay.state(1))}")
-        
+        log.debug("Generator manual OFF")
+    
+# Écriture de l'état dans un fichier texte pour communiquer l'état à d'autres programmes
+    with open("MagAGS.txt", "w") as f:
+        f.write(f"{data[0][0]},{SOCmin},{data[0][1]},{SOCmax},{resp},{cvtstate(relay.state(1))}\n")
+
+# Gestion de la temporisation et sortie du programme
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
