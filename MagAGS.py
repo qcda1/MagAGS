@@ -41,14 +41,62 @@ def cvtstate(state):
     return 'OFF'
 
 def getcurrentstate(relay):
-    try:
-        if relay.state(1) is True:
-            return 'ON'
-        else:
-            return 'OFF'
-    except Exception as e:
-        log.error(f"Erreur lors de la lecture de l'état du relais: {e}")
-        return "Inconnu... Erreur lors de la lecture de l'état du relais"
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if relay.state(1) is True:
+                return 'ON'
+            else:
+                return 'OFF'
+        except Exception as e:
+            log.error(f"Erreur lors de la lecture de l'état du relais (tentative {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)  # Attendre 1 seconde avant de réessayer
+            else:
+                # Après tous les essais, tenter une reconnexion
+                return "ERROR"
+    return "ERROR"
+
+
+def reconnect_relay(relay, max_attempts=3, delay=2):
+    """
+    Tente de reconnecter le relais en fermant proprement l'ancienne connexion
+    et en en créant une nouvelle - équivalent à un arrêt/redémarrage du programme
+    """
+    for attempt in range(max_attempts):
+        try:
+            log.warning(f"Tentative de reconnexion au relais ({attempt + 1}/{max_attempts})")
+            
+            # Fermer proprement l'ancienne connexion (équivalent à l'arrêt du programme)
+            try:
+                if relay is not None:
+                    relay.close()
+                    log.debug("Ancienne connexion au relais fermée")
+            except Exception as e:
+                log.debug(f"Erreur lors de la fermeture (ignorée): {e}")
+            
+            # Petit délai pour laisser l'USB se stabiliser
+            time.sleep(delay)
+            
+            # Créer une nouvelle connexion (équivalent au redémarrage du programme)
+            new_relay = Relay(idVendor=0x16c0, idProduct=0x05df)
+            
+            # Tester la nouvelle connexion
+            new_relay.state(0, on=False)
+            test_state = new_relay.state(1)  # Lecture de test
+            
+            log.info("Relais reconnecté avec succès")
+            return new_relay
+            
+        except Exception as e:
+            log.error(f"Échec de reconnexion (tentative {attempt + 1}): {e}")
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+            else:
+                log.critical("Toutes les tentatives de reconnexion ont échoué")
+    
+    return None
+
 
 # ===========Programme Principal=======================================================
 
@@ -57,16 +105,17 @@ fmt = '%(asctime)s %(levelname)s %(lineno)s %(message)s'
 logging.basicConfig(level=getconf('ll'), filename=getconf('lf'), format=fmt)
 log = logging.getLogger('MagAGS')
 
-log.setLevel(llevel(getconf('ll')))
 log.info("Début du programme")
-log.info("Log Level = %s", getconf('ll'))
+
+
+logl = getconf('ll')
+log.setLevel(llevel(logl))
+log.info(f"Log level= {logl}")
+# Backup des paramêtres de configuration
+loglb = logl
 
 # Détermination de l'enregistrement des conditions d'opération
 ftype = getconf('ftype')
-
-
-# Backup des paramêtres de configuration
-llevelb = ''
 
 # Intervale de temps
 interval = 60 # boucle aux 60 secondes
@@ -75,6 +124,10 @@ interval = 60 # boucle aux 60 secondes
 cmd = 'RUN'
 
 frun = None
+
+# Contient la réponse de la décision s'il faut démarrer la génératrice
+# ou non em mode AUTO
+resp = ''
 
 # Connexion à la base de données
 conn = sqlite3.connect("../monitormidnite/monitormidnite.db")
@@ -85,11 +138,20 @@ relay = Relay(idVendor=0x16c0, idProduct=0x05df)
 # Turn all switches off
 relay.state(0, on=False)
 
+relay_error_count = 0
+max_relay_errors = 5  # Reconnecter après 5 erreurs consécutives
+
 while cmd == 'RUN':
     start = time.time()
-    log.setLevel(llevel(getconf('ll')))
-    log.debug("Bouclage... %s", time.ctime())
+    log.debug("Looping... %s", time.ctime())
 
+    logl = getconf('ll')
+    log.setLevel(llevel(logl))
+    if logl != loglb:
+        log.info(f"Changement de log level de {loglb} à {logl}")
+        loglb = logl
+
+    # Contrôle de l'exécution du programme
     cmd = getconf('cmd')
 
     # Valeurs des SOC min et max
@@ -102,34 +164,63 @@ while cmd == 'RUN':
 
     genctrl = getconf('genctrl')
 
+# Vérifier si le relais a besoin d'être reconnecté
+    if relay_error_count >= max_relay_errors:
+        log.warning("Trop d'erreurs de relais détectées, tentative de reconnexion complète...")
+        new_relay = reconnect_relay(relay, max_attempts=3, delay=3)  # Passer l'objet relay existant
+        if new_relay is not None:
+            relay = new_relay
+            relay_error_count = 0
+            log.info("Relais reconnecté - reprise normale des opérations")
+        else:
+            log.critical("Impossible de reconnecter le relais après plusieurs tentatives")
+            # Option: envoyer une alerte par email ou autre
+
     # Lecture du dernier enregistrement de la table des données opérationnelles avec
     # l'horodateur et l'état de charge de la batterie
     curs.execute("select dtm, soc from onem order by dtm desc limit 1")
     onem_dtm, onem_soc = curs.fetchone()
     
     if genctrl == "AUTO":
-
         # Détermination du besoin de démarrage ou de l'arrêt de la génératrice
-        resp =manage_gen(onem_soc, SOCmin, SOCmax, relay)
-        log.debug(f"dtm={onem_dtm}, SOCmin={SOCmin}, SOC={onem_soc}, SOCmax={SOCmax}, resp = {resp}, currentstate={getcurrentstate(relay)}")
+        resp = manage_gen(onem_soc, SOCmin, SOCmax, relay)
+        
+        current_state = getcurrentstate(relay)
+        if current_state == "ERROR":
+            relay_error_count += 1
+            log.warning(f"Erreur de lecture du relais (compteur: {relay_error_count})")
+        else:
+            relay_error_count = 0  # Réinitialiser le compteur si succès
+            
+        log.debug(f"dtm={onem_dtm}, SOCmin={SOCmin}, SOC={onem_soc}, SOCmax={SOCmax}, resp = {resp}, currentstate={current_state}")
 
-        # Contrôle du relais selon le besoin de démarrage ou de l'arrêt de la génératrice
+        # Contrôle du relais selon le besoin
         if resp == "ON":
-            relay.state(1, on=True)
-            log.debug("Generator auto on")
+            try:
+                relay.state(1, on=True)
+                log.debug("Generator AUTO ON")
+            except Exception as e:
+                log.error(f"Erreur lors de l'activation du relais: {e}")
+                relay_error_count += 1
+                
         if resp == "OFF":
-            relay.state(1, on=False)
-            log.debug("Generator auto off")
-        log.debug(f"dtm={onem_dtm}, SOCmin={SOCmin}, SOC={onem_soc}, SOCmax={SOCmax}, resp={resp}, currentstate={getcurrentstate(relay)}")
-    elif genctrl == "ON":
-        resp = "MANUAL ON"
+            try:
+                relay.state(1, on=False)
+                log.debug("Generator auto off")
+            except Exception as e:
+                log.error(f"Erreur lors de la désactivation du relais: {e}")
+                relay_error_count += 1
+
+    elif genctrl == 'ON': # On force l'opération ON en mode manuel.
+        log.debug('Generator MANUAL RUN')
+        resp = "MANUAL"
         relay.state(1, on=True)
-        log.debug("Generator manual ON")
-    elif genctrl == "OFF":
-        resp = "MANUAL OFF"
+
+    elif genctrl == 'OFF': # On force l'opération OFF en mode manuel.
+        log.debug('Generator MANUAL OFF')
+        resp = "MANUAL"
         relay.state(1, on=False)
-        log.debug("Generator manual OFF")
-    
+
 # Écriture de l'état dans un fichier texte pour communiquer l'état à d'autres programmes
     if ftype == 'txt':
         ftxt = "test.txt"
@@ -177,6 +268,7 @@ while cmd == 'RUN':
             time.sleep(delay)
         except KeyboardInterrupt:
             log.info("KeyboardInterrupt")
+            print("KeyboardInterrupt")
             cmd = 'STOP'
             conn.close()
             break
