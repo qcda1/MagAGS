@@ -53,7 +53,7 @@ This confirm the AGS will be triggered by the ME-PT2 connector and the generator
 #### My first test showed that shorting momentarily the ME-PT2 wires for a few seconds, the generator started but to my surprise, ran for approx two minutes instead of the 0,5h minimum setting. This does not correspond to the technical description in the manual. Parameter checks and few other tests were performed to confirm the behavior. A test was then performed by keeping the wires shorted for 10 minutes. the generator ran for that time and stopped when the wires were disconnected. The programming was asjusted accordingly.
 
 
-As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt%20ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2%20Instruction%20Sheet.md)
+As a reference, here is an excerpt of the [ME-AGS-N manual](Excerpt-0ME-AGS-N%20manual.md) and the [ME-PT2 Instruction Sheet](ME-PT2-Instruction-Sheet.md)
 
 ## Application
 Included in this repository is a copy of my automatic generator start program MagAGS.py. It is made of a never-ending loop that monitors the battery bank's State Of Charge (SOC) and drive the generator start relay based on a lower and upper limit of the SOC. The SOC is read from an operational data acquisition database that keeps track of my solar energy system components. The program can be easily adapted to any systems that tracks a battery SOC.
