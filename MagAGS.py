@@ -12,6 +12,7 @@
 import logging
 import sqlite3
 import time
+from datetime import date
 from conf import getconf
 from relay import Relay
 from manage_gen import manage_gen
@@ -34,6 +35,14 @@ def llevel(level):
     if level == 'CRITICAL':
         return 50
     return 20
+
+# Détermine si nous sommes le premier dimanche du mois.
+def is_first_sunday(d: date = None) -> bool:
+    """Retourne True si la date donnée (ou aujourd'hui) est le premier dimanche du mois."""
+    if d is None:
+        d = date.today()
+    # weekday() retourne 6 pour dimanche, et si le jour est <= 7, c'est le premier
+    return d.weekday() == 6 and d.day <= 7
 
 def cvtstate(state):
     if state == True:
@@ -153,6 +162,11 @@ while cmd == 'RUN':
 
     # Contrôle de l'exécution du programme
     cmd = getconf('cmd')
+
+    # Sommes-nous le premier dimance du mois ?
+    if is_first_sunday():
+        print("NOUS SOMMES LE PREMIER DIMANCHE DU MOIS...")
+        print("IL FAUT FAIRE FAIRE L'EXERCICE DE LA GÉNÉRATRICE!!!")
 
     # Valeurs des SOC min et max
     SOCmin = int(getconf('SOCsetpoints')[0:2])
