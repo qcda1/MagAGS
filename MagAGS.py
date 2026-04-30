@@ -12,7 +12,7 @@
 import logging
 import sqlite3
 import time
-from datetime import date
+from datetime import date, datetime
 from conf import getconf
 from relay import Relay
 from manage_gen import manage_gen
@@ -36,13 +36,52 @@ def llevel(level):
         return 50
     return 20
 
-# Détermine si nous sommes le premier dimanche du mois.
-def is_first_sunday(d: date = None) -> bool:
-    """Retourne True si la date donnée (ou aujourd'hui) est le premier dimanche du mois."""
-    if d is None:
-        d = date.today()
-    # weekday() retourne 6 pour dimanche, et si le jour est <= 7, c'est le premier
-    return d.weekday() == 6 and d.day <= 7
+# Détermine si nous sommes en exercice.
+def is_time2exercise_old() -> bool:
+    """Retourne True si nous sommes dans la période d'exercice."""
+    d = date.today()
+    d = datetime(2026, 5, 3) # Force au premier dimanche du mois de mai 2026
+    t = time.localtime()
+#    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:01:03 2026
+    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:15:03 2026
+#    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:20:03 2026
+    t1 = 0
+    if d.weekday() == 6 and d.day <= 7: # weekday() retourne 6 pour dimanche, et si le jour est <= 7, c'est le premier
+        print("On est bien le premier dimanche du mois...")
+        if t.tm_hour == 20:
+            print("Il est bien passé 20h...")
+            if t1 == 0:
+                t1 = time.time()
+            if time.time() - t1 < 1200:
+                print(f"On est bien dans la période de 20 minutes...{time.time() - t1}")
+                return True
+            else:
+                t1 = 0
+    return False
+
+def is_time2exercise(t: str, duration: int = 1200) -> bool:
+    # --- Validation du format 'HHMM' ---
+    if len(t) != 4 or not t.isdigit():
+        return False
+    hh, mm = int(t[:2]), int(t[2:])
+    if hh > 23 or mm > 59:
+        return False
+
+    today = date.today()
+    now = datetime.now()
+
+    # --- Condition 1 : premier dimanche du mois ---
+    if not (today.weekday() == 6 and today.day <= 7):
+        return False
+
+    # --- Condition 2 : l'heure t est atteinte ---
+    target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if now < target:
+        return False
+
+    # --- Condition 3 : moins de 1200 secondes (20 min) depuis t ---
+    elapsed = (now - target).total_seconds()
+    return elapsed < duration
 
 def cvtstate(state):
     if state == True:
@@ -150,6 +189,8 @@ relay.state(0, on=False)
 relay_error_count = 0
 max_relay_errors = 5  # Reconnecter après 5 erreurs consécutives
 
+exercise_gen = False # Détermine si la génératrice est en exercice True=oui, False=non
+
 while cmd == 'RUN':
     start = time.time()
     log.debug("Looping... %s", time.ctime())
@@ -163,10 +204,30 @@ while cmd == 'RUN':
     # Contrôle de l'exécution du programme
     cmd = getconf('cmd')
 
-    # Sommes-nous le premier dimance du mois ?
-    if is_first_sunday():
-        print("NOUS SOMMES LE PREMIER DIMANCHE DU MOIS...")
-        print("IL FAUT FAIRE FAIRE L'EXERCICE DE LA GÉNÉRATRICE!!!")
+# Contrôle de l'exercice de la génératrice
+# La génératrice est démarrée chaque premier dimanche du mois à exh et pour une durée de exd.
+    exercise = getconf('ex') # ON ou OFF
+    exercise_time = getconf('exh') # Heure en format HHMM
+    exercise_duration = getconf('exd')
+
+    if exercise == 'ON': # L'option d'exercice est active
+        # Sommes-nousen exercise ?
+        if is_time2exercise(exercise_time, 1200):
+            log.info(f"Nous sommes le premier dimanche du mois et il est passé {exercise_time}")
+            if exercise_gen == False:
+                relay.state(1, on=True)
+                log.debug("Période d'exercice activée...")
+                exercise_gen=True
+                continue # Rien ne sert de voir si il faut démarrer la génératrice selon le SOC
+        else:
+            if exercise_gen == True:
+                relay.state(1, on=False)
+                log.debug("Période d'exercice terminée...")
+                exercise_gen=False
+
+
+# Contröle de la génératrice selon le SOC (State Of Charge)
+# La génératrice démarre lorsque le SOC décroit et atteint SOCmin et arrête lorsque SOCmax est atteint
 
     # Valeurs des SOC min et max
     SOCmin = int(getconf('SOCsetpoints')[0:2])
@@ -209,7 +270,7 @@ while cmd == 'RUN':
         log.debug(f"dtm={onem_dtm}, SOCmin={SOCmin}, SOC={onem_soc}, SOCmax={SOCmax}, resp = {resp}, currentstate={current_state}")
 
         # Contrôle du relais selon le besoin
-        if resp == "ON":
+        if resp == "ON": # Il faut démarrer la génératrice selon manage_gen()
             try:
                 relay.state(1, on=True)
                 log.debug("Generator AUTO ON")
@@ -217,7 +278,7 @@ while cmd == 'RUN':
                 log.error(f"Erreur lors de l'activation du relais: {e}")
                 relay_error_count += 1
                 
-        if resp == "OFF":
+        if resp == "OFF": # Il faut arrêter la génératrice selon manage_gen()
             try:
                 relay.state(1, on=False)
                 log.debug("Generator auto off")
