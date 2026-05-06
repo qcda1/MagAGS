@@ -15,7 +15,7 @@ lf,MagAGS.log
 # Assure une boucle quand cmd = RUN.
 # Une valeur autre qye RUN sort de la boucle
 # et termine le programme.
-cmd,RUN
+cmd,OFF
 
 # SOCsetpoints is made of a pair of two integers of two digits
 # representing the low limit SOC and high limit SOC.
@@ -43,11 +43,11 @@ fSQLite,/usr/local/bin/MagAGS/MagAGS.db
 # Exercices de la génératrice
 #
 # Activation de l'exercice ex ON ou OFF
-ex,ON 
+ex,ON
 
 # Heure de la journée où l'exercice doit avoir lieu
 # Format: HHMM sur 24h bien entendu.
 exh,2000
 
 # Durée de l'exercice en secondes
-exd,1200
+exd,600

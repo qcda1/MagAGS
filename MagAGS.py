@@ -1,341 +1,370 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Programme de suivi de l'état de charge SOC de la batterie et contrôle 
-# de la génératrice selon des seuils minimum et maxmimum.
+# Programme de suivi de l'état de charge SOC de la batterie et contrôle
+# de la génératrice selon des seuils minimum et maximum.
 # Ce programme a été fait pour remplacer le module ME-BMK de Magnum-Energy
 # qui a des problèmes à effectuer le suivi du SOC de la batterie.
 #
 # Auteur: Daniel Cote, Mars 2025
-# 
+# Migré vers YAML pour la configuration.
+#
 
 import logging
 import sqlite3
 import time
+import yaml
 from datetime import date, datetime
-from conf import getconf
 from relay import Relay
 from manage_gen import manage_gen
 
-# Convertit les niveaux de sévérité en leur valeurs de type int
-# Retourne 20 par défaut si aucun match.
+# ===========Chargement de la configuration==========================================
 
-def llevel(level):
-    ''' Convertit les niveaux de sévérité en leur valeurs de type int
-        Retourne 20 par défaut si aucun match.
-    '''
-    if level == 'DEBUG':
-        return 10
-    if level == 'INFO':
-        return 20
-    if level == 'WARNING':
-        return 30
-    if level == 'ERROR':
-        return 40
-    if level == 'CRITICAL':
-        return 50
-    return 20
+def load_config(path: str = "MagAGS.yaml") -> dict:
+    """Charge et retourne le fichier de configuration YAML."""
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
 
-# Détermine si nous sommes en exercice.
-def is_time2exercise_old() -> bool:
-    """Retourne True si nous sommes dans la période d'exercice."""
-    d = date.today()
-    d = datetime(2026, 5, 3) # Force au premier dimanche du mois de mai 2026
-    t = time.localtime()
-#    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:01:03 2026
-    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:15:03 2026
-#    t = time.localtime(1777852863.0) # Force l'heure à Sun May  3 20:20:03 2026
-    t1 = 0
-    if d.weekday() == 6 and d.day <= 7: # weekday() retourne 6 pour dimanche, et si le jour est <= 7, c'est le premier
-        print("On est bien le premier dimanche du mois...")
-        if t.tm_hour == 20:
-            print("Il est bien passé 20h...")
-            if t1 == 0:
-                t1 = time.time()
-            if time.time() - t1 < 1200:
-                print(f"On est bien dans la période de 20 minutes...{time.time() - t1}")
-                return True
-            else:
-                t1 = 0
-    return False
+# Chargement initial de la configuration
+conf = load_config()
+
+# ===========Utilitaires=============================================================
+
+def llevel(level: str) -> int:
+    """Convertit les niveaux de sévérité en leur valeur entière.
+    Retourne 20 (INFO) par défaut si aucun match.
+    """
+    levels = {
+        'DEBUG':    10,
+        'INFO':     20,
+        'WARNING':  30,
+        'ERROR':    40,
+        'CRITICAL': 50,
+    }
+    return levels.get(level, 20)
+
+
+def reload_config(path: str = "MagAGS.yaml") -> dict:
+    """Recharge le fichier de configuration à chaque itération de la boucle.
+    Permet de modifier la configuration sans redémarrer le programme.
+    """
+    try:
+        return load_config(path)
+    except Exception as e:
+        log.error(f"Erreur lors du rechargement de la configuration: {e}")
+        return conf  # Retourne l'ancienne configuration en cas d'erreur
+
 
 def is_time2exercise(t: str, duration: int = 1200) -> bool:
+    """Détermine si c'est le moment de faire l'exercice de la génératrice.
+
+    L'exercice a lieu le premier dimanche du mois, à l'heure t,
+    pour une durée de `duration` secondes.
+
+    Args:
+        t:        Heure cible au format 'HHMM'.
+        duration: Fenêtre de temps en secondes pendant laquelle la condition est vraie.
+
+    Returns:
+        True si les trois conditions sont réunies, False sinon.
+    """
+    log.debug(f"Entrée dans is_time2exercise: t={t}, duration={duration}")
+
     # --- Validation du format 'HHMM' ---
     if len(t) != 4 or not t.isdigit():
+        log.error(f"Format de l'heure incorrect: {t}")
         return False
     hh, mm = int(t[:2]), int(t[2:])
     if hh > 23 or mm > 59:
+        log.error(f"Heure incorrecte: {hh}:{mm}")
         return False
 
     today = date.today()
     now = datetime.now()
 
     # --- Condition 1 : premier dimanche du mois ---
+    log.debug(f"Sommes-nous le premier dimanche du mois: {today.weekday()} == 6 and {today.day} <= 7")
     if not (today.weekday() == 6 and today.day <= 7):
         return False
 
     # --- Condition 2 : l'heure t est atteinte ---
     target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    log.debug(f"Heure {now} avant {target}")
     if now < target:
         return False
 
-    # --- Condition 3 : moins de 1200 secondes (20 min) depuis t ---
+    # --- Condition 3 : moins de `duration` secondes depuis t ---
     elapsed = (now - target).total_seconds()
+    log.debug(f"Temps écoulé: {elapsed} secondes")
     return elapsed < duration
 
-def cvtstate(state):
-    if state == True:
-        return 'ON'
-    return 'OFF'
 
-def getcurrentstate(relay):
+def getcurrentstate(relay) -> str:
+    """Lit l'état courant du relais avec 3 tentatives.
+
+    Returns:
+        'ON', 'OFF', ou 'ERROR'.
+    """
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            if relay.state(1) is True:
-                return 'ON'
-            else:
-                return 'OFF'
+            return 'ON' if relay.state(1) is True else 'OFF'
         except Exception as e:
-            log.error(f"Erreur lors de la lecture de l'état du relais (tentative {attempt + 1}/{max_retries}): {e}")
+            log.error(f"Erreur lors de la lecture de l'état du relais "
+                      f"(tentative {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                time.sleep(1)  # Attendre 1 seconde avant de réessayer
-            else:
-                # Après tous les essais, tenter une reconnexion
-                return "ERROR"
+                time.sleep(1)
     return "ERROR"
 
 
-def reconnect_relay(relay, max_attempts=3, delay=2):
-    """
-    Tente de reconnecter le relais en fermant proprement l'ancienne connexion
-    et en en créant une nouvelle - équivalent à un arrêt/redémarrage du programme
+def reconnect_relay(relay, max_attempts: int = 3, delay: int = 2):
+    """Tente de reconnecter le relais en fermant proprement l'ancienne connexion
+    et en créant une nouvelle — équivalent à un arrêt/redémarrage du programme.
+
+    Args:
+        relay:        Objet Relay existant (peut être None).
+        max_attempts: Nombre de tentatives de reconnexion.
+        delay:        Délai en secondes entre les tentatives.
+
+    Returns:
+        Nouvel objet Relay si succès, None sinon.
     """
     for attempt in range(max_attempts):
         try:
             log.warning(f"Tentative de reconnexion au relais ({attempt + 1}/{max_attempts})")
-            
-            # Fermer proprement l'ancienne connexion (équivalent à l'arrêt du programme)
+
+            # Fermer proprement l'ancienne connexion
             try:
                 if relay is not None:
                     relay.close()
                     log.debug("Ancienne connexion au relais fermée")
             except Exception as e:
                 log.debug(f"Erreur lors de la fermeture (ignorée): {e}")
-            
-            # Petit délai pour laisser l'USB se stabiliser
+
             time.sleep(delay)
-            
-            # Créer une nouvelle connexion (équivalent au redémarrage du programme)
+
+            # Créer une nouvelle connexion
             new_relay = Relay(idVendor=0x16c0, idProduct=0x05df)
-            
-            # Tester la nouvelle connexion
             new_relay.state(0, on=False)
-            test_state = new_relay.state(1)  # Lecture de test
-            
+            new_relay.state(1)  # Lecture de test
+
             log.info("Relais reconnecté avec succès")
             return new_relay
-            
+
         except Exception as e:
             log.error(f"Échec de reconnexion (tentative {attempt + 1}): {e}")
             if attempt < max_attempts - 1:
                 time.sleep(delay)
-            else:
-                log.critical("Toutes les tentatives de reconnexion ont échoué")
-    
+
+    log.critical("Toutes les tentatives de reconnexion ont échoué")
     return None
 
 
-# ===========Programme Principal=======================================================
+# ===========Programme Principal=====================================================
 
-#configure logging.
+# Configuration du logging
 fmt = '%(asctime)s %(levelname)s %(lineno)s %(message)s'
-logging.basicConfig(level=getconf('ll'), filename=getconf('lf'), format=fmt)
+logging.basicConfig(
+    level=llevel(conf['logging']['level']),
+    filename=conf['logging']['file'],
+    format=fmt
+)
 log = logging.getLogger('MagAGS')
 
 log.info("Début du programme")
+log.info(f"Log level= {conf['logging']['level']}")
 
+# Sauvegarde du niveau de log pour détecter les changements
+loglb = conf['logging']['level']
 
-logl = getconf('ll')
-log.setLevel(llevel(logl))
-log.info(f"Log level= {logl}")
-# Backup des paramêtres de configuration
-loglb = logl
+# Intervalle de temps de la boucle principale (secondes)
+interval = 60
 
-# Détermination de l'enregistrement des conditions d'opération
-ftype = getconf('ftype')
-
-# Intervale de temps
-interval = 60 # boucle aux 60 secondes
-
-# Condition de la boucle sans fin. Si la valeur change, on sort de la boucle.
+# Condition de la boucle sans fin
 cmd = 'RUN'
 
+# Mémorise l'état précédent pour la table magagss (évite les écritures inutiles)
 frun = None
+gencontrol_prev = start_limit_prev = stop_limit_prev = expected_state_prev = relay_state_prev = None
 
-# Contient la réponse de la décision s'il faut démarrer la génératrice
-# ou non em mode AUTO
+# Réponse de manage_gen() : 'ON', 'OFF', ou 'MANUAL'
 resp = ''
 
-# Connexion à la base de données
-conn = sqlite3.connect("../monitormidnite/monitormidnite.db")
+# Connexion à la base de données opérationnelle (lecture du SOC)
+conn = sqlite3.connect("/usr/local/bin/monitormidnite/monitormidnite.db")
 curs = conn.cursor()
 
-# Objet relay
+# Initialisation du relais
 relay = Relay(idVendor=0x16c0, idProduct=0x05df)
-# Turn all switches off
-relay.state(0, on=False)
+relay.state(0, on=False)  # Tous les canaux à OFF au démarrage
 
 relay_error_count = 0
-max_relay_errors = 5  # Reconnecter après 5 erreurs consécutives
+max_relay_errors  = 5     # Reconnecter après 5 erreurs consécutives
 
-exercise_gen = False # Détermine si la génératrice est en exercice True=oui, False=non
+exercise_gen = False      # True si la génératrice est en période d'exercice
+
+
+# ===========Boucle principale=======================================================
 
 while cmd == 'RUN':
     start = time.time()
-    log.debug("Looping... %s", time.ctime())
+    log.debug("\nDébut de la boucle principale... %s", time.ctime())
 
-    logl = getconf('ll')
+    # --- Rechargement de la configuration à chaque itération ---
+    conf = reload_config()
+
+    # Détection d'un changement de niveau de log
+    logl = conf['logging']['level']
     log.setLevel(llevel(logl))
     if logl != loglb:
         log.info(f"Changement de log level de {loglb} à {logl}")
         loglb = logl
 
     # Contrôle de l'exécution du programme
-    cmd = getconf('cmd')
+    cmd = conf['cmd']
 
-# Contrôle de l'exercice de la génératrice
-# La génératrice est démarrée chaque premier dimanche du mois à exh et pour une durée de exd.
-    exercise = getconf('ex') # ON ou OFF
-    exercise_time = getconf('exh') # Heure en format HHMM
-    exercise_duration = getconf('exd')
+    # --- Exercice de la génératrice ---
+    # Démarrage chaque premier dimanche du mois à exercise.time pour exercise.duration secondes.
+    exercise_enabled  = conf['generator']['exercise']['enabled']
+    exercise_time     = conf['generator']['exercise']['time']
+    exercise_duration = conf['generator']['exercise']['duration']
 
-    if exercise == 'ON': # L'option d'exercice est active
-        # Sommes-nousen exercise ?
-        if is_time2exercise(exercise_time, 1200):
-            log.info(f"Nous sommes le premier dimanche du mois et il est passé {exercise_time}")
-            if exercise_gen == False:
-                relay.state(1, on=True)
-                log.debug("Période d'exercice activée...")
-                exercise_gen=True
-                continue # Rien ne sert de voir si il faut démarrer la génératrice selon le SOC
-        else:
-            if exercise_gen == True:
-                relay.state(1, on=False)
-                log.debug("Période d'exercice terminée...")
-                exercise_gen=False
+    log.debug(f"exercise_enabled={exercise_enabled}, exercise_time={exercise_time}, "
+              f"exercise_duration={exercise_duration}")
 
+    if exercise_enabled and is_time2exercise(exercise_time, exercise_duration):
+        log.debug(f"Nous sommes le premier dimanche du mois et il est passé {exercise_time}, exercise_gen={exercise_gen}")
+        if not exercise_gen:
+            relay.state(1, on=True)
+            log.info("Période d'exercice activée...")
+            exercise_gen = True
+    else:
+        if exercise_gen:
+            relay.state(1, on=False)
+            log.info("Période d'exercice terminée...")
+            exercise_gen = False
 
-# Contröle de la génératrice selon le SOC (State Of Charge)
-# La génératrice démarre lorsque le SOC décroit et atteint SOCmin et arrête lorsque SOCmax est atteint
+        log.debug(f"Hors période d'exercice: exercise_enabled={exercise_enabled}, "
+                  f"exercise_gen={exercise_gen}")
 
-    # Valeurs des SOC min et max
-    SOCmin = int(getconf('SOCsetpoints')[0:2])
-    SOCmax = int(getconf('SOCsetpoints')[2:4])
+        # --- Contrôle selon le SOC ---
+        SOCmin  = conf['generator']['soc_min']
+        SOCmax  = conf['generator']['soc_max']
+        genctrl = conf['generator']['control']
+        ftype   = conf['output']['type']
+        ftxt    = conf['output']['txt_file']
+        fSQLite = conf['output']['sqlite_file']
 
-    ftype = getconf('ftype')
-    ftxt = getconf('ftxt')
-    fSQLite = getconf('fSQLite')
+        # Reconnexion du relais si trop d'erreurs consécutives
+        if relay_error_count >= max_relay_errors:
+            log.warning("Trop d'erreurs de relais détectées, tentative de reconnexion complète...")
+            new_relay = reconnect_relay(relay, max_attempts=3, delay=3)
+            if new_relay is not None:
+                relay = new_relay
+                relay_error_count = 0
+                log.info("Relais reconnecté — reprise normale des opérations")
+            else:
+                log.critical("Impossible de reconnecter le relais après plusieurs tentatives")
+                # Option: envoyer une alerte par email ou autre
 
-    genctrl = getconf('genctrl')
+        # Lecture du dernier enregistrement de la table des données opérationnelles avec
+        # l'horodateur (UTC) et l'état de charge de la batterie
+        curs.execute("SELECT dtm, soc FROM onem ORDER BY dtm DESC LIMIT 1")
+        onem_dtm, onem_soc = curs.fetchone()
 
-# Vérifier si le relais a besoin d'être reconnecté
-    if relay_error_count >= max_relay_errors:
-        log.warning("Trop d'erreurs de relais détectées, tentative de reconnexion complète...")
-        new_relay = reconnect_relay(relay, max_attempts=3, delay=3)  # Passer l'objet relay existant
-        if new_relay is not None:
-            relay = new_relay
-            relay_error_count = 0
-            log.info("Relais reconnecté - reprise normale des opérations")
-        else:
-            log.critical("Impossible de reconnecter le relais après plusieurs tentatives")
-            # Option: envoyer une alerte par email ou autre
+        if genctrl == "AUTO":
+            resp = manage_gen(onem_soc, SOCmin, SOCmax, relay)
 
-    # Lecture du dernier enregistrement de la table des données opérationnelles avec
-    # l'horodateur et l'état de charge de la batterie
-    curs.execute("select dtm, soc from onem order by dtm desc limit 1")
-    onem_dtm, onem_soc = curs.fetchone()
-    
-    if genctrl == "AUTO":
-        # Détermination du besoin de démarrage ou de l'arrêt de la génératrice
-        resp = manage_gen(onem_soc, SOCmin, SOCmax, relay)
-        
-        current_state = getcurrentstate(relay)
-        if current_state == "ERROR":
-            relay_error_count += 1
-            log.warning(f"Erreur de lecture du relais (compteur: {relay_error_count})")
-        else:
-            relay_error_count = 0  # Réinitialiser le compteur si succès
-            
-        log.debug(f"dtm={onem_dtm}, SOCmin={SOCmin}, SOC={onem_soc}, SOCmax={SOCmax}, resp = {resp}, currentstate={current_state}")
-
-        # Contrôle du relais selon le besoin
-        if resp == "ON": # Il faut démarrer la génératrice selon manage_gen()
-            try:
-                relay.state(1, on=True)
-                log.debug("Generator AUTO ON")
-            except Exception as e:
-                log.error(f"Erreur lors de l'activation du relais: {e}")
+            current_state = getcurrentstate(relay)
+            if current_state == "ERROR":
                 relay_error_count += 1
-                
-        if resp == "OFF": # Il faut arrêter la génératrice selon manage_gen()
-            try:
-                relay.state(1, on=False)
-                log.debug("Generator auto off")
-            except Exception as e:
-                log.error(f"Erreur lors de la désactivation du relais: {e}")
-                relay_error_count += 1
+                log.warning(f"Erreur de lecture du relais (compteur: {relay_error_count})")
+            else:
+                relay_error_count = 0
 
-    elif genctrl == 'ON': # On force l'opération ON en mode manuel.
-        log.debug('Generator MANUAL RUN')
-        resp = "MANUAL"
-        relay.state(1, on=True)
+            log.debug(f"dtm={onem_dtm} (UTC), SOCmin={SOCmin}, SOC={onem_soc}, "
+                      f"SOCmax={SOCmax}, resp={resp}, currentstate={current_state}")
 
-    elif genctrl == 'OFF': # On force l'opération OFF en mode manuel.
-        log.debug('Generator MANUAL OFF')
-        resp = "MANUAL"
-        relay.state(1, on=False)
+            if resp == "ON":
+                try:
+                    relay.state(1, on=True)
+                    log.debug(f"Génératrice ON — genctrl={genctrl} relay={getcurrentstate(relay)}")
+                except Exception as e:
+                    log.error(f"Erreur lors de l'activation du relais: {e}")
+                    relay_error_count += 1
 
-# Écriture de l'état dans un fichier texte pour communiquer l'état à d'autres programmes
+            elif resp == "OFF":
+                try:
+                    relay.state(1, on=False)
+                    log.debug(f"Génératrice OFF — genctrl={genctrl} relay={getcurrentstate(relay)}")
+                except Exception as e:
+                    log.error(f"Erreur lors de la désactivation du relais: {e}")
+                    relay_error_count += 1
+
+        elif genctrl == 'ON':
+            log.debug(f"Mode MANUEL ON — relay={getcurrentstate(relay)}")
+            resp = "MANUAL"
+            relay.state(1, on=True)
+
+        elif genctrl == 'OFF':
+            log.debug(f"Mode MANUEL OFF — relay={getcurrentstate(relay)}")
+            resp = "MANUAL"
+            relay.state(1, on=False)
+
+    # --- Écriture de l'état ---
+
     if ftype == 'txt':
-        ftxt = "test.txt"
-        with open(getconf('ftxt'), "w") as f:
+        with open(ftxt, "w") as f:
             f.write(f"{onem_dtm},{SOCmin},{onem_soc},{SOCmax},{resp},{getcurrentstate(relay)}\n")
-# Écriture de l'état dans une table SQLite3 seulement lors d'un changement de statut.
+
     if ftype == 'sql':
-        if frun is None: # On lit les dernières valeurs au démarrage du programme
-            log.debug("première run... On lit le dernier enregistrement de la table.")
-            conn = sqlite3.connect(fSQLite)
-            curs1 = conn.cursor()
-            curs1.execute("SELECT * FROM magagss")
-            seq, dtm, gencontrol, start_limit, soc, stop_limit, expected_state, relay_state = curs1.fetchone()
-            conn.close()
+        current_state = getcurrentstate(relay)
+
+        # Lecture du dernier enregistrement au premier démarrage
+        if frun is None:
+            log.debug("Première itération — lecture du dernier enregistrement de magagss.")
+            db = sqlite3.connect(fSQLite)
+            cur1 = db.cursor()
+            cur1.execute("SELECT * FROM magagss")
+            row = cur1.fetchone()
+            db.close()
+            if row:
+                _, _, gencontrol_prev, start_limit_prev, _, stop_limit_prev, \
+                    expected_state_prev, relay_state_prev = row
             frun = 1
 
-        conn = sqlite3.connect(fSQLite)
-# Pour magags, on enregistre que si il y a un changement avec l'enregistrement précédent
-        if gencontrol != genctrl or start_limit != SOCmin or stop_limit != SOCmax \
-            or expected_state != resp or relay_state != getcurrentstate(relay):
-            print(f"Différences dans les enregistrements... {onem_dtm}")
-            conn.execute("""
-            INSERT INTO magags VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (onem_dtm, genctrl, SOCmin, onem_soc, SOCmax, resp, getcurrentstate(relay)))
-            gencontrol = genctrl
-            start_limit = SOCmin
-            soc = onem_soc
-            stop_limit = SOCmax
-            expected_state = resp
-            relay_state = getcurrentstate(relay)
+        db = sqlite3.connect(fSQLite)
 
-# On conserve toujours le dernier état dans magagss dans un seul enregistrement
-        conn.execute("""
-        INSERT OR REPLACE INTO magagss VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (1, onem_dtm, genctrl, SOCmin, onem_soc, SOCmax, resp, getcurrentstate(relay)))
-        conn.commit()        
+        # Enregistrement dans magags seulement en cas de changement
+        if (gencontrol_prev != genctrl or start_limit_prev != SOCmin
+                or stop_limit_prev != SOCmax or expected_state_prev != resp
+                or relay_state_prev != current_state):
+            log.warning(f"Changement détecté — enregistrement dans magags: {onem_dtm}")
+            db.execute(
+                "INSERT INTO magags VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (onem_dtm, genctrl, SOCmin, onem_soc, SOCmax, resp, current_state)
+            )
+            gencontrol_prev   = genctrl
+            start_limit_prev  = SOCmin
+            stop_limit_prev   = SOCmax
+            expected_state_prev = resp
+            relay_state_prev  = current_state
+
+        # Toujours conserver le dernier état dans magagss (un seul enregistrement)
+        db.execute(
+            "INSERT OR REPLACE INTO magagss VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (1, onem_dtm, genctrl, SOCmin, onem_soc, SOCmax, resp, current_state)
+        )
+        db.commit()
+        db.close()
+
+    # --- Gestion de la temporisation et sortie du programme ---
+
+    if cmd != 'RUN':
+        log.info(f"cmd != 'RUN', sortie de la boucle principale: {cmd}")
         conn.close()
-        
-        
-# Gestion de la temporisation et sortie du programme
+        break
+
     duration = time.time() - start
     delay = interval - duration
     if delay > 0:
@@ -344,10 +373,8 @@ while cmd == 'RUN':
         except KeyboardInterrupt:
             log.info("KeyboardInterrupt")
             print("KeyboardInterrupt")
-            cmd = 'STOP'
             conn.close()
             break
 
 log.info("Fin de la boucle principale et du programme...")
-
 conn.close()

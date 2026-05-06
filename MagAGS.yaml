@@ -1,0 +1,41 @@
+# Fichier de configuration pour le programme MagAGS.py.
+#
+# Auteur: Daniel Cote, Mars 2025
+#
+
+logging:
+  # Niveau de log: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  # Chemin du fichier de log
+  file: MagAGS.log
+
+# Contrôle de la boucle principale.
+# Toute valeur autre que RUN termine le programme.
+cmd: RUN
+
+generator:
+  # Mode de contrôle de la génératrice
+  # AUTO: contrôle automatique selon le SOC
+  # ON:   mise en marche manuelle
+  # OFF:  arrêt manuel
+  control: AUTO
+
+  # Seuils de l'état de charge (SOC) en pourcentage
+  soc_min: 20 # On démarre la génératrice lorsqu'on atteint ce seuil
+  soc_max: 30 # On arrête la génératrice lorsqu'on atteint ce seuil
+
+  # Exercice mensuel de la génératrice
+  # Démarrage chaque premier dimanche du mois à l'heure spécifiée
+  exercise:
+    enabled: true        # true ou false
+    time: "2000"         # Heure de départ au format HHMM (24h)
+    duration: 1200       # Durée de l'exercice en secondes
+
+# Deux types d'historique de traces des conditions d'opération de MagAGS
+output:
+  # Type de sortie des conditions d'opération: txt ou sql
+  type: sql
+  # Chemin du fichier texte CSV (utilisé si type: txt)
+  txt_file: /usr/local/bin/MagAGS/MagAGS.txt
+  # Chemin de la base de données SQLite (utilisé si type: sql)
+  sqlite_file: /usr/local/bin/MagAGS/MagAGS.db
