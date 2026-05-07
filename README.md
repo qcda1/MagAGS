@@ -76,4 +76,5 @@ The SOC is read from an operational data acquisition database that keeps track o
 - The above solution is based on the excellent work performed here: https://github.com/jaketeater/Very-Simple-USB-Relay
 - USB relay board datasheet: [USBB-RELAY-08(DatasheetFR).pdf](https://github.com/user-attachments/files/18773244/USBB-RELAY-08.DatasheetFR.pdf)
 - ME-PT2 connector: [64-0026-Rev-D-ME-PT2_Booklet_Print.pdf](https://github.com/user-attachments/files/18773310/64-0026-Rev-D-ME-PT2_Booklet_Print.pdf)
-- 
+- Magnum MS4448PAE info: [MAgnum Dimention](https://www.magnum-dimensions.com/product-inverter/4400w-48vdc-pure-sine-inverter-charger-ms-pae)
+
